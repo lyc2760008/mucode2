@@ -1,0 +1,2092 @@
+<?php
+/*
+
+
+//object(Material)#2 (17) { ["primNum"]=> string(3) "107" ["itemNum"]=> string(11) "55101000010" ["descrip"]=> string(23) "GUARD WOOD-MOULDING" ["uom"]=> string(2) "EA" ["supplier"]=> string(5) "Eecol" ["manu"]=> string(16) "AB CUSHING MILLS" ["partNum"]=> string(10) "ENMAX Spec" ["validDate"]=> string(10) "2019-12-31" ["unitPrice"]=> string(7) "13.6500" ["guessPrice"]=> string(5) ".0000" ["quantity"]=> float(1) ["totalPrice"]=> float(13.65) ["totalGuessPrice"]=> float(0) ["minQtyOrder"]=> float(1) ["minQtyNotes"]=> string(0) "" ["PrefLeadTime"]=> int(0) ["PrefLeadTimeDays"]=> float(0) }
+*/
+require 'vendor/autoload.php';
+
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+
+/* var_dump($_POST);
+var_dump($_GET); */
+
+if(sizeof($_GET) > 0){
+	$projectID = trim($_GET['projectID']);
+	$stage = trim($_GET['stage']);
+	$version = trim($_GET['version']);
+	$estimateType = trim($_GET['estimateType']);
+}else if (sizeof($_POST) > 0){
+	$projectID = trim($_POST['projectID']);
+	$stage = trim($_POST['stage']);
+	$version = trim($_POST['version']);
+	$estimateType = trim($_POST['estimateType']);
+}
+
+$sheetname = "Enmax";
+if ($estimateType == "Fortis Alberta"){
+	$sheetname = "Fortis";
+}else if ($estimateType == "City of Calgary"){
+	$sheetname = "CoC";
+}
+//echo $projectID."<br>"; echo $stage."<br>"; echo $version."<br>"; echo $estimateType."<br>";
+
+$styleArray = [
+    'font' => [
+        'bold' => true,
+		'color' => [ 'rgb' => '000000' ],
+    ],
+    'alignment' => [
+        'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT,
+		'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 
+		'textRotation' => 0, 
+		'wrapText' => TRUE,
+    ],
+    'borders' => [
+        'outline' => [
+            'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+			'color' => ['rgb' => '000000'],
+        ],
+    ],
+];
+
+$styleArray2 = [
+    'font' => [
+        'bold' => false,
+		'color' => [ 'rgb' => '000000' ],
+    ],
+    'alignment' => [
+        'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+		'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 
+		'textRotation' => 0, 
+		'wrapText' => TRUE,
+    ],
+    'borders' => [
+        'right' => [
+            'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+			'color' => ['rgb' => '000000'],
+        ],
+    ],
+];
+
+$styleArray3 = [
+    'font' => [
+	    'size' => 12,
+        'bold' => true,
+		'color' => [ 'rgb' => '000000' ],
+    ],
+	'alignment' => [
+        'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+		'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 
+		'textRotation' => 0, 
+		'wrapText' => TRUE,
+    ],
+];
+
+$styleArray4 = [
+    'font' => [
+	    'size' => 12,
+        'bold' => true,
+		'color' => [ 'rgb' => '0000FF' ],
+    ],
+];
+
+$styleArray5 = [
+    'font' => [
+	    'size' => 12,
+        'bold' => true,
+		'color' => [ 'rgb' => '000000' ],
+    ],
+];
+
+$styleArray6 = [
+	'alignment' => [
+        'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT,
+		'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 
+		'textRotation' => 0, 
+		'wrapText' => TRUE,
+    ],
+];
+
+$ClientNumber = '';
+$Description = '';
+$Address = '';
+$EstimatedBy = '';
+$DateCreated = '';
+$Contractor = '';
+$MaterialSupplier = '';
+$Notes = '';
+$LastModifiedBy = '';
+$LastModifiedDate = '';
+$Designer = '';
+$ProjectManager = '';
+$Eng_P_Cost = 0.0;
+$Eng_D_Cost = 0.0;
+$Struc_M_Cost = 0.0;
+$Struc_L_Cost = 0.0;
+$Material_Cost = 0.0;
+$Labour_Cost = 0.0;
+$Permit_M_Cost = 0.0;
+$Permit_L_Cost = 0.0;
+$Extra_M_Cost = 0.0;
+$Extra_L_Cost = 0.0;
+$EPC_Sec_TotalCost = 0.0;
+$split_50_Eng = false;
+$Quote_Cost = 0.0;
+$epc_cost_per = 0.0;
+$epc_chevy_per = 0.0;
+$contingency_percentage = 0.0;
+$contingency_percentage_xtask = 0.0;
+$contingency_percentage_mtask = 0.0;
+$contingency_percentage_ctask = 0.0;
+$markup_percentage = 0.0;
+$markup_percentage_xtask = 0.0;
+$markup_percentage_mtask = 0.0;
+$markup_percentage_ctask = 0.0;
+$total_revenue = 0.0;
+$total_shaw_cost = 0.0;
+// for main estimate tab
+$proj_struc = [];
+$proj_mat = [];
+$proj_lab = [];
+$proj_permits = [];
+$proj_extra = [];
+$proj_extra_report = [];
+$proj_eng = [];
+$proj_epc = [];
+$proj_shaw = [];
+
+// For material list exports tabs
+$material_list = [];
+$sand_total = 0.0;
+$gravel_total = 0.0;
+$concrete_total = 0.0;
+$vendor_list = [];
+$vendor_list_ForPO= [];
+
+Class Material{
+   public $itemNum = '';
+   public $descrip = '';
+   public $uom = '';
+   public $supplier = '';
+   public $manu = '';
+   public $partNum = '';
+   public $validDate = '';
+   public $unitPrice = 0.0;
+   public $guessPrice = 0.0;
+   public $quantity = 0.0;
+   public $totalPrice = 0.0;
+   public $totalGuessPrice = 0.0;
+   public $minQtyOrder = 0.0;
+   public $minQtyNotes = '';
+   public $LeadTime = false;
+   public $LeadTimeDays = 0.0;
+}
+
+Class Vendor{
+	public $vendorName = '';
+	public $materialList = []; // itemNUm, description, qty, uom, unit price, estimate price
+}
+
+$server = 'PECSQL3SRV';
+$connectionInfo = array( "Database"=>"FPECAPP", "UID"=>"asd", "PWD"=>"asd");
+$conn = sqlsrv_connect( $server, $connectionInfo);
+
+if ($conn) {
+// query1 for the main estimate table
+ $query = "SELECT [ProjectID]
+      ,[Stage]
+      ,[Version]
+      ,[Type]
+      ,[ClientNumber]
+      ,[Description]
+      ,[Address]
+      ,[EstimatedBy]
+      ,[DateCreated]
+      ,[Contractor]
+      ,[MaterialSupplier]
+      ,[Notes]
+      ,[LastModifiedBy]
+      ,[LastModifiedDate]
+	  ,[Designer], [ProjectManager]
+      ,[Eng_P_Cost]
+      ,[Eng_D_Cost]
+      ,[Struc_M_Cost]
+      ,[Struc_L_Cost]
+      ,[Material_Cost]
+      ,[Labour_Cost]
+      ,[Permit_M_Cost]
+      ,[Permit_L_Cost]
+      ,[Extra_M_Cost]
+      ,[Extra_L_Cost]
+      ,[EPC_Sec_TotalCost]
+      ,[split_50_Eng]
+      ,[Quote_Cost]
+      ,[epc_cost_per]
+      ,[epc_chevy_per]
+	  ,[contingency_percentage]
+	  ,[contingency_percentage_xtask]
+	  ,[contingency_percentage_mtask]
+	  ,[contingency_percentage_ctask]
+      ,[markup_percentage]
+	  ,[markup_percentage_xtask]
+	  ,[markup_percentage_mtask]
+	  ,[markup_percentage_ctask]
+	  ,[shaw_cost_total]
+  FROM [NewEstimator].[dbo].[Estimates]  
+  where ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."'"; 
+ 	$stmt = sqlsrv_query($conn, $query);
+	if ( $stmt === false){
+		die( print_r( sqlsrv_errors(), true));
+	}else {	
+		while ($row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC)) {
+			$ClientNumber = trim($row['ClientNumber']);
+			$Description = trim($row['Description']);
+			$Address = trim($row['Address']);
+			$EstimatedBy = trim($row['EstimatedBy']);
+			if($row['DateCreated'] !== Null){
+					if($row['DateCreated'] != ""){
+						$DateCreated = date_format($row['DateCreated'],'Y-m-d');
+					}
+				}
+			$Contractor = trim($row['Contractor']);
+			$MaterialSupplier = trim($row['MaterialSupplier']);
+			$Designer = trim($row['Designer']);
+			$ProjectManager = trim($row['ProjectManager']);
+			$Notes = trim($row['Notes']);
+			$LastModifiedBy = trim($row['LastModifiedBy']);
+			if($row['LastModifiedDate'] !== Null){
+					if($row['LastModifiedDate'] != ""){
+						$LastModifiedDate = date_format($row['LastModifiedDate'],'Y-m-d');
+					}
+				}
+			$Eng_P_Cost = $row['Eng_P_Cost'];
+			$Eng_D_Cost = $row['Eng_D_Cost'];
+			$Struc_M_Cost = $row['Struc_M_Cost'];
+			$Struc_L_Cost = $row['Struc_L_Cost'];
+			$Material_Cost = $row['Material_Cost'];
+			$Labour_Cost = $row['Labour_Cost']; 
+			$Permit_M_Cost = $row['Permit_M_Cost'];
+			$Permit_L_Cost = $row['Permit_L_Cost'];
+			$Extra_M_Cost = $row['Extra_M_Cost'];
+			$Extra_L_Cost = $row['Extra_L_Cost'];
+			$EPC_Sec_TotalCost = $row['EPC_Sec_TotalCost'];
+			if($row['split_50_Eng'] == true){
+				$split_50_Eng = true;
+			}
+			
+			$Quote_Cost = $row['Quote_Cost'];
+			$epc_cost_per = $row['epc_cost_per'];
+			$epc_chevy_per = $row['epc_chevy_per']; 
+			$contingency_percentage = $row['contingency_percentage'];
+			$contingency_percentage_xtask = $row['contingency_percentage_xtask'];
+			$contingency_percentage_mtask = $row['contingency_percentage_mtask'];
+			$contingency_percentage_ctask = $row['contingency_percentage_ctask'];
+            $markup_percentage = $row['markup_percentage'];
+			$markup_percentage_xtask = $row['markup_percentage_xtask'];
+			$markup_percentage_mtask = $row['markup_percentage_mtask'];
+			$markup_percentage_ctask = $row['markup_percentage_ctask'];
+			
+			$total_shaw_cost =  $row['shaw_cost_total'];
+		}
+		sqlsrv_free_stmt( $stmt);
+		//sqlsrv_close($conn);
+	}
+
+$queryStr = "SELECT [ProjectID]
+      ,[Stage]
+      ,[Version]
+      ,[Type]
+      ,[StrucID]
+      ,[Description]
+      ,[StrucType]
+      ,[StrQty]
+      ,[StrMaterialCost]
+      ,[StrLabourCost]
+	  ,[complexityFactor]
+  FROM [NewEstimator].[dbo].[ProjectEstStructures]
+  where ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."'
+  order by StrucID"; 
+ 	$stmt = sqlsrv_query($conn, $queryStr);
+	if ( $stmt === false){
+		die( print_r( sqlsrv_errors(), true));
+	}else {	
+	    $count = 0;
+		while ($row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC)) {
+			 $proj_struc[$count] = [trim($row['StrucID']) ,trim($row['Description']), $row['StrQty'], $row['StrMaterialCost'], $row['StrLabourCost'], $row['complexityFactor']];
+			 $count++;
+		 
+		}
+		sqlsrv_free_stmt( $stmt);
+		//sqlsrv_close($conn);
+	}
+  
+$queryMat = "Select [ProjectID]
+      ,[Stage]
+      ,[Version]
+      ,[Type]
+      ,[itemNumber]
+      ,[qty]
+      ,[price]
+      ,[AcctCategory]
+      ,[Task]
+	  ,b.PreferredVendDescr, b.UoM
+	  FROM [NewEstimator].[dbo].[ProjectEstMaterials] a
+	  left join NewEstimator.dbo.MasterMaterial_PreferredVendor_List b
+  on ";
+  if ($estimateType == "Enmax"){
+	  $queryMat .= " a.itemNumber = b.EnmaxItemNumber ";
+  }else if ($estimateType == "Fortis Alberta"){
+	   $queryMat .= " a.ItemNumber = b.FortisItemNumber ";
+  }else if ($estimateType == "City of Calgary") {
+	  $queryMat .= " a.ItemNumber = b.CoCItemNumber  ";
+  } 
+  
+  $queryMat.="  where ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."'  
+  order by itemNumber"; 
+  
+ 	$stmt = sqlsrv_query($conn, $queryMat);
+	if ( $stmt === false){
+		die( print_r( sqlsrv_errors(), true));
+	}else {	
+	    $count = 0;
+		while ($row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC)) {
+			 $proj_mat[$count] = [trim($row['itemNumber']) ,trim($row['PreferredVendDescr']), $row['qty'], $row['price'], $row['qty'] * $row['price'], $row['UoM'], $row['Task'], $row['AcctCategory']];
+			 $count++;
+		 
+		}
+		sqlsrv_free_stmt( $stmt);
+		//sqlsrv_close($conn);
+	}
+	
+$queryLab = "SELECT  [ProjectID]
+      ,[Stage]
+      ,[Version]
+      ,[Type]
+      ,[ContractorID]
+      ,a.[LabourUnit]
+      ,[UnitPrice]
+      ,[ItemCount]
+      ,[totalValue]
+      ,[AcctCategory]
+	  ,[complexityFactor]
+      ,[Task], b.Description, b.UoM
+  FROM [NewEstimator].[dbo].[ProjectEstLabour] a  left join NewEstimator.dbo.LabourUnits b on a.LabourUnit = b.LabourUnit
+  where ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."'
+  order by LabourUnit"; 
+ 	$stmt = sqlsrv_query($conn, $queryLab);
+	if ( $stmt === false){
+		die( print_r( sqlsrv_errors(), true));
+	}else {	
+	    $count = 0;
+		while ($row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC)) {
+			 $proj_lab[$count] = [trim($row['LabourUnit']) ,trim($row['Description']), $row['ItemCount'], $row['UnitPrice'], $row['totalValue'], $row['UoM'], $row['complexityFactor'],$row['Task'], $row['AcctCategory']];
+			 $count++;
+		 
+		}
+		sqlsrv_free_stmt( $stmt);
+		//sqlsrv_close($conn);
+	}
+	
+ $queryPermits = "SELECT [ProjectID]
+      ,[Stage]
+      ,[Version]
+      ,[Type]
+      ,[xcavID]
+      ,[permitItem]
+      ,[vendor]
+      ,[uom]
+      ,[itemType]
+      ,[labourCost]
+      ,[materialCost]
+      ,[qty]
+      ,[labourCost_total]
+      ,[materialCost_total]
+      ,[AcctCategory]
+      ,[Task]   FROM [NewEstimator].[dbo].[ProjectEstPermits]
+  where ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."'
+  order by xcavID"; 
+ 	$stmt = sqlsrv_query($conn, $queryPermits);
+	if ( $stmt === false){
+		die( print_r( sqlsrv_errors(), true));
+	}else {	
+	    $count = 0;
+		while ($row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC)) {
+			 $proj_permits[$count] = [trim($row['vendor']) ,trim($row['permitItem']),$row['qty'], $row['labourCost'] +$row['materialCost'], $row['materialCost_total'] + $row['labourCost_total'], trim($row['uom']), $row['Task'], $row['AcctCategory']];
+			 $count++;
+		 
+		}
+		sqlsrv_free_stmt( $stmt);
+		//sqlsrv_close($conn);
+	}
+ 
+ $queryExtra = "SELECT [ProjectID]
+      ,[Stage]
+      ,[Version]
+      ,[Type]
+      ,[xtraID]
+      ,[itemDescrip]
+      ,[vendor]
+      ,[uom]
+      ,[cost]
+      ,[itemType]
+      ,[quantity]
+      ,[totalCost]
+      ,[AcctCategory]
+      ,[Task]
+  FROM [NewEstimator].[dbo].[ProjectEstExtraCostItems]
+  where ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."'"; 
+ 	$stmt = sqlsrv_query($conn, $queryExtra);
+	if ( $stmt === false){
+		die( print_r( sqlsrv_errors(), true));
+	}else {	
+	    $count = 0;
+		while ($row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC)) {
+			$proj_extra[$count] = [trim($row['vendor']),trim($row['itemDescrip']), $row['quantity'], $row['cost'],$row['totalCost'], trim($row['uom']), $row['Task'], $row['AcctCategory']];
+			 $count++;
+		 
+		}
+		sqlsrv_free_stmt( $stmt);
+		//sqlsrv_close($conn);
+	} 
+	
+ $queryEng = "SELECT [ProjectID]
+      ,[Stage]
+      ,[Version]
+      ,[Type]
+      ,[eng_id]
+      ,[EngResource]
+      ,[Rate]
+      ,[itemCount]
+      ,[totalValue]
+      ,[AcctCategory]
+      ,[Task]
+  FROM [NewEstimator].[dbo].[ProjectEstEngResources]
+  where itemCount > 0.0 and ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."'
+  order by eng_id"; 
+ 	$stmt = sqlsrv_query($conn, $queryEng);
+	if ( $stmt === false){
+		die( print_r( sqlsrv_errors(), true));
+	}else {	
+	    $count = 0;
+		while ($row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC)) {
+			 $proj_eng[$count] = [trim($row['EngResource']),  $row['itemCount'], $row['Rate'], $row['totalValue']];
+			 $count++;
+		 
+		}
+		sqlsrv_free_stmt( $stmt);
+		//sqlsrv_close($conn);
+	} 
+	
+ $queryEPC = "SELECT [ProjectID]
+      ,[Stage]
+      ,[Version]
+      ,[Type]
+      ,[epc_ID]
+      ,[epcItem]
+      ,[epcRate]
+      ,[epcPercentage]
+      ,[epcQty_Factor]
+      ,[totalEPCValue]
+  FROM [NewEstimator].[dbo].[ProjEstEPCTable]
+  where epcQty_Factor > 0.0 and ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."'
+  order by epc_ID"; 
+ 	$stmt = sqlsrv_query($conn, $queryEPC);
+	if ( $stmt === false){
+		die( print_r( sqlsrv_errors(), true));
+	}else {	
+	    $count = 0;
+		while ($row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC)) {
+			 $proj_epc[$count] = [trim($row['epcItem']), $row['epcQty_Factor'], $row['epcRate'], $row['totalEPCValue']];
+			 $count++;
+		 
+		}
+		sqlsrv_free_stmt( $stmt);
+		//sqlsrv_close($conn);
+	}
+	
+	$queryShaw = "SELECT [ProjectID]
+      ,[Stage]
+      ,[Version]
+      ,[Type]
+      ,[shaw_id]
+      ,[shaw_item]
+      ,[shaw_rate]
+      ,[itemCount]
+      ,[totalAmount]
+  FROM [NewEstimator].[dbo].[ProjectEstShawCosts]
+  where itemCount > 0.0 and ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."'
+  order by shaw_id"; 
+ 	$stmt = sqlsrv_query($conn, $queryShaw);
+	if ( $stmt === false){
+		die( print_r( sqlsrv_errors(), true));
+	}else {	
+	    $count = 0;
+		while ($row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC)) {
+			 $proj_shaw[$count] = [trim($row['shaw_item']), $row['itemCount'], $row['shaw_rate'], $row['totalAmount']];
+			 $count++;
+		 
+		}
+		sqlsrv_free_stmt( $stmt);
+		//sqlsrv_close($conn);
+	}
+	
+
+  
+	//Queries for material export reports
+	$matQuery1 = ''; $matQuery2 = '';
+	if($MaterialSupplier == "Preferred Vendor"){
+		if ($estimateType == "City of Calgary"){
+			$materCol = "b.CoCItemNumber  ";
+			$materColP = "c.CoCItemNumber  ";
+		}else if ($estimateType == "Fortis Alberta"){
+			$materCol = "b.FortisItemNumber  ";
+			$materColP = "c.FortisItemNumber  ";
+		}else {
+			$materCol = "b.EnmaxItemNumber  ";
+			$materColP = "c.EnmaxItemNumber  ";
+		}
+		$matQuery1 = "SELECT a.[ProjectID]
+					  ,a.[Stage]
+					  ,a.[Version]
+					  ,a.[Type]
+					  ,a.[StrucID]
+					  ,a.[StrucType]
+					  ,case when a.StrQty is null OR a.StrQty = 0 then 0 else a.StrQty end as StrQty
+					 -- ,b.PrimaryItemNumber
+					  ,b.ItemNumber
+					  ,case when b.ItemCount is null OR b.ItemCount = 0 then 0 else b.ItemCount end as ItemCount
+					  ,c.PreferredVendDescr as Description
+					  ,c.PreferredVendorName as VendorName
+					  ,case when c.PreferredVendorPrice is null OR c.PreferredVendorPrice = 0 then 0 else c.PreferredVendorPrice end as Price
+					  ,case when c.PreferredVendorGPrice is null OR c.PreferredVendorGPrice = 0 then 0 else  c.PreferredVendorGPrice end as GuessPrice
+					  ,c.minQtyOrder
+					  ,c.minQtyNotes
+					  ,c.PrefLeadTime as LeadTime
+					  ,c.PrefLeadTimeDays as LeadTimeDays
+					  ,c.ValidToDate
+					  ,c.UoM
+					  ,d.ManuName
+					  ,d.PartNumber
+					  ,StrQty * ItemCount as qty
+					  ,StrQty * ItemCount * PreferredVendorPrice as PriceA
+					  ,StrQty * ItemCount * PreferredVendorGPrice as PriceG
+					  ,ISNULL(siteID, '') as siteID
+			          ,ISNull(department,'') as department
+					  ,'50028' as Account
+				      , 'M' as Task
+				  FROM [NewEstimator].[dbo].[ProjectEstStructures] a
+				  left join NewEstimator.dbo.StructuresMaterialDetails b
+				  on a.StrucID = b.StrucID and a.StrucType = b.StrucType
+				  left join NewEstimator.dbo.MasterMaterial_PreferredVendor_List c
+				  on b.ItemNumber = ".$materColP."
+				  left join NewEstimator.dbo.VendorSupplies d
+				  on  b.ItemNumber = d.ItemNum and c.PreferredVendorName = d.VendorName and d.itemType = '".$estimateType."' 
+				  left join [NewEstimator].[dbo].[Estimates] e
+				  on e.projectID= a.projectID and e.stage =a.stage and e.version =a.version and e.type=a.type 				  
+				  where a.ProjectID = '".$projectID."' and a.Stage = '".$stage."' and a.Version = '".$version."' and  a.StrucType = '".$estimateType."' ";
+  
+		$matQuery2 = "SELECT a.[ProjectID]
+					  ,a.[Stage]
+					  ,a.[Version]
+					  ,a.[Type]
+					  --,[PrimaryNum]
+					  ,[itemNumber] as ItemNumber
+					  ,[qty]
+					  ,a.[price] as estPrice
+					  ,[AcctCategory]
+					  ,[Task]
+					  ,b.PreferredVendDescr as Description
+					  ,b.PreferredVendorName as VendorName
+					  ,case when b.PreferredVendorPrice is null OR b.PreferredVendorPrice = 0 then 0 else b.PreferredVendorPrice end as Price
+					  ,case when b.PreferredVendorGPrice is null OR b.PreferredVendorGPrice = 0 then 0 else  b.PreferredVendorGPrice end as GuessPrice
+					  ,b.minQtyOrder
+					  ,b.minQtyNotes
+					  ,b.PrefLeadTime as LeadTime
+					  ,b.PrefLeadTimeDays as LeadTimeDays
+					  ,b.ValidToDate
+					  ,b.UoM
+					  ,c.ManuName
+					  ,c.PartNumber	
+					  ,ISNULL(siteID, '') as siteID
+			          ,ISNull(department,'') as department	
+                      , AcctCategory as 'Account'
+			          , Task as 'Task'					  
+				  FROM [NewEstimator].[dbo].[ProjectEstMaterials] a 
+				  left join NewEstimator.dbo.MasterMaterial_PreferredVendor_List b
+				  on a.itemNumber = ".$materCol."
+				  left join NewEstimator.dbo.VendorSupplies c 
+				  on a.itemNumber = c.ItemNum  and b.PreferredVendorName = c.VendorName and c.itemType = '".$estimateType."' 
+				  left join [NewEstimator].[dbo].[Estimates] e
+				  on e.projectID= a.projectID and e.stage =a.stage and e.version =a.version and e.type=a.type 
+				  where a.ProjectID = '".$projectID."' and a.Stage = '".$stage."' and a.Version = '".$version."' and  a.Type = '".$estimateType."' ";
+	}
+	else{
+		$matQuery1 = "SELECT est.[ProjectID]
+					  ,est.[Stage]
+					  ,est.[Version]
+					  ,est.[Type]
+					  ,[MaterialSupplier]
+					  ,a.[StrucID]
+					  ,a.[StrucType]
+					  ,case when a.StrQty is null OR a.StrQty = 0 then 0 else a.StrQty end as StrQty
+					  --,b.PrimaryItemNumber
+					  ,b.ItemNumber
+					  ,case when b.ItemCount is null OR b.ItemCount = 0 then 0 else b.ItemCount end as ItemCount
+					  ,d.Description
+					  ,d.VendorName
+					  ,case when d.Price is null OR d.Price = 0 then 0 else d.Price end as Price
+					  ,case when d.GuessPrice is null OR d.GuessPrice = 0 then 0 else  d.GuessPrice end as GuessPrice
+					  ,d.minQtyOrder
+					  ,d.minQtyNotes
+					  ,d.LeadTime
+					  ,d.LeadTimeDays
+					  ,d.ValidToDate
+					  ,d.UoM
+					  ,d.ManuName
+					  ,d.PartNumber
+					  ,StrQty * ItemCount as qty
+					  ,StrQty * ItemCount * Price as PriceA
+					  ,StrQty * ItemCount * GuessPrice as PriceG
+					  , ISNULL(siteID, '')  as siteID
+					  , ISNULL(department, '') as department
+					  ,'50028' as Account
+				      , 'M' as Task
+				  FROM [NewEstimator].[dbo].[Estimates] est
+				  left join [NewEstimator].[dbo].[ProjectEstStructures] a
+				  on est.ProjectID = a.ProjectID and est.Stage = a.Stage and est.Version = a.Version and est.Type = a.StrucType
+				  left join NewEstimator.dbo.StructuresMaterialDetails b
+				  on a.StrucID = b.StrucID and a.StrucType = b.StrucType
+				  left join NewEstimator.dbo.VendorSupplies d
+				  on b.ItemNumber = d.ItemNum and est.MaterialSupplier = d.VendorName and d.itemType = '".$estimateType."'  
+				  where est.ProjectID = '".$projectID."' and est.Stage = '".$stage."' and est.Version = '".$version."' and  a.StrucType = '".$estimateType."' ";
+				  
+		$matQuery2 = "SELECT est.[ProjectID]
+			  ,est.[Stage]
+			  ,est.[Version]
+			  ,est.[Type]
+			  ,[MaterialSupplier]
+			  ,[itemNumber] as ItemNumber
+			  ,[qty]
+			  ,a.[price] as estPrice
+			  ,[AcctCategory]
+			  ,[Task]
+			  ,b.VendorName
+			  ,b.Description
+			  ,b.ManuName
+			  ,b.PartNumber
+			  ,b.uom as UoM
+			  ,b.ValidToDate
+			  ,case when b.Price is null OR b.Price = 0 then 0 else b.Price end as Price
+			  ,case when b.GuessPrice is null OR b.GuessPrice = 0 then 0 else  b.GuessPrice end as GuessPrice
+			  ,b.minQtyOrder
+			  ,b.minQtyNotes
+			  ,b.LeadTime
+			  ,b.LeadTimeDays
+			  ,ISNULL(siteID, '')  as siteID
+			  ,ISNULL(department, '') as department
+			  , AcctCategory as 'Account'
+			  , Task as 'Task'
+		FROM [NewEstimator].[dbo].[Estimates] est
+		left join NewEstimator.dbo.ProjectEstMaterials a
+		on est.ProjectID = a.ProjectID and est.Stage = a.Stage and est.Version = a.Version and est.Type = a.Type
+		left join NewEstimator.dbo.VendorSupplies b
+		on a.itemNumber = b.ItemNum and est.MaterialSupplier = b.VendorName  and b.itemType = '".$estimateType."' 
+		where est.ProjectID = '".$projectID."' and est.Stage = '".$stage."' and est.Version = '".$version."' and  est.Type = '".$estimateType."' ";
+				
+	}
+// adding materials from structures table
+ 	$stmt = sqlsrv_query($conn, $matQuery1);
+	if ( $stmt === false){
+		die( print_r( sqlsrv_errors(), true));
+	}else {	
+	    //echo $matQuery1."<br>";
+		$curr_material = "";
+		while ($row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC)) {
+			$curr_material = trim($row['ItemNumber']);
+			if(array_key_exists($curr_material, $material_list)){
+				// update qty for existing material item
+				$exist_mat = $material_list[$curr_material];
+				$exist_mat->quantity += $row['StrQty'] * $row['ItemCount'];
+				$exist_mat->totalPrice += $row['StrQty'] * $row['ItemCount'] * $row['Price'];
+				$exist_mat->totalGuessPrice += $row['StrQty'] * $row['ItemCount'] * $row['GuessPrice'];	
+			}
+			else{
+				// create the material item
+				$mat = new Material();
+				$mat->itemNum = trim($row['ItemNumber']);
+				$mat->descrip = trim($row['Description']);
+				$mat->uom = trim($row['UoM']);
+				$mat->supplier = trim($row['VendorName']);
+				$mat->manu = trim($row['ManuName']);
+				$mat->partNum = trim($row['PartNumber']);
+				//is_null($result['column'])
+				if($row['ValidToDate'] !== Null){
+					if($row['ValidToDate'] != ""){
+						$mat->validDate = date_format($row['ValidToDate'],'Y-m-d');
+					}
+				}
+				$mat->unitPrice = $row['Price'];
+				$mat->guessPrice = $row['GuessPrice'];
+				$mat->minQtyOrder = $row['minQtyOrder'];
+				$mat->minQtyNotes = trim($row['minQtyNotes']);
+				$mat->LeadTime = $row['LeadTime'];
+				$mat->LeadTimeDays = $row['LeadTimeDays'];
+				
+				$mat->quantity = $row['StrQty'] * $row['ItemCount'];
+				$mat->totalPrice = $row['StrQty'] * $row['ItemCount'] * $row['Price'];
+				$mat->totalGuessPrice = $row['StrQty'] * $row['ItemCount'] * $row['GuessPrice'];
+				$mat->siteID= $row['siteID'];
+				$mat->department= $row['department'];
+				$mat->Account= $row['Account'];
+				$mat->Task= $row['Task'];
+				$material_list[$curr_material] = $mat;
+			}
+			
+		}
+		sqlsrv_free_stmt( $stmt);
+		//sqlsrv_close($conn);
+	} 
+
+//adding materials from just materials	table
+ 	$stmt = sqlsrv_query($conn, $matQuery2);
+	if ( $stmt === false){
+		die( print_r( sqlsrv_errors(), true));
+	}else {
+		$curr_material = "";
+		while ($row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC)) {
+			$curr_material = trim($row['ItemNumber']);
+			if(array_key_exists($curr_material, $material_list)){
+				// update qty for existing material item
+				$exist_mat = $material_list[$curr_material];
+				$exist_mat->quantity += $row['qty'] ;
+				$exist_mat->totalPrice += $row['qty'] * $row['Price'];
+				$exist_mat->totalGuessPrice += $row['qty']  * $row['GuessPrice'];	
+			}
+			else{
+				// create the material item
+				$mat = new Material();
+				$mat->itemNum = trim($row['ItemNumber']);
+				$mat->descrip = trim($row['Description']);
+				$mat->uom = trim($row['UoM']);
+				$mat->supplier = trim($row['VendorName']);
+				$mat->manu = trim($row['ManuName']);
+				$mat->partNum = trim($row['PartNumber']);
+				//is_null($result['column'])
+				if($row['ValidToDate'] !== Null){
+					if($row['ValidToDate'] != ""){
+						$mat->validDate = date_format($row['ValidToDate'],'Y-m-d');
+					}
+				}
+				$mat->unitPrice = $row['Price'];
+				$mat->guessPrice = $row['GuessPrice'];
+				$mat->minQtyOrder = $row['minQtyOrder'];
+				$mat->minQtyNotes = trim($row['minQtyNotes']);
+				$mat->LeadTime = $row['LeadTime'];
+				$mat->LeadTimeDays = $row['LeadTimeDays'];
+				
+				$mat->quantity = $row['qty'];
+				$mat->totalPrice = $row['qty'] * $row['Price'];
+				$mat->totalGuessPrice = $row['qty'] * $row['GuessPrice'];
+				$mat->siteID= $row['siteID'];
+				$mat->department= $row['department'];
+				$mat->Account= $row['Account'];
+				$mat->Task= $row['Task'];
+				$material_list[$curr_material] = $mat;
+			}
+			
+		}
+		sqlsrv_free_stmt( $stmt);
+				
+	}
+// budget report project extra items query	
+$queryExtra2 = "  Select Task, AcctCategory, sum(cost) as totalCost from(
+	SELECT [price] * [qty] as cost
+      ,[AcctCategory]
+      ,[Task]
+  FROM [NewEstimator].[dbo].[ProjectEstMaterials] where ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."' 
+  Union
+  SELECT [totalValue] as cost
+      ,[AcctCategory]
+      ,[Task]
+  FROM [NewEstimator].[dbo].[ProjectEstLabour] where ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."' 
+  Union
+  SELECT [labourCost_total] + [materialCost_total] as cost
+      ,[AcctCategory]
+      ,[Task]
+  FROM [NewEstimator].[dbo].[ProjectEstPermits]  where ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."' 
+  Union
+  SELECT [totalCost] as cost
+      ,[AcctCategory]
+      ,[Task]
+  FROM [NewEstimator].[dbo].[ProjectEstExtraCostItems]  where ProjectID = '".$projectID."' and Stage = '".$stage."' and Version = '".$version."' and  Type = '".$estimateType."' ) myTable group by AcctCategory, Task "; 
+    //echo $queryExtra2;
+ 	$stmt = sqlsrv_query($conn, $queryExtra2);
+	if ( $stmt === false){
+		die( print_r( sqlsrv_errors(), true));
+	}else {	
+	    $count = 0;
+		while ($row = sqlsrv_fetch_array( $stmt, SQLSRV_FETCH_ASSOC)) {
+			$proj_extra_report[$count] = [trim($row['AcctCategory']), $row['totalCost'], trim($row['Task'])];
+			 $count++;
+		 
+		}
+		sqlsrv_free_stmt( $stmt);
+		sqlsrv_close($conn);
+	}
+
+
+
+
+}
+else {
+	die('Something went wrong while connecting to MSSQL');
+	die( print_r( sqlsrv_errors(), true));
+}
+
+//for vendor list 
+$curr_vendor = "";
+foreach($material_list as $key=>$value){
+	$curr_vendor = $value->supplier;
+	if(array_key_exists($curr_vendor, $vendor_list)){
+		//$exiting_ven_mat_list = $vendor_list[$curr_vendor];
+		array_push($vendor_list[$curr_vendor], [$key, $value->descrip, $value->quantity, $value->uom, $value->unitPrice, $value->totalPrice ]);
+	}else{
+		$vend = New Vendor();
+		$vend->vendorName = $curr_vendor;
+		array_push($vend->materialList, [$key, $value->descrip, $value->quantity, $value->uom, $value->unitPrice, $value->totalPrice ]);
+		$vendor_list[$curr_vendor] = $vend->materialList;
+		
+	}
+}
+
+
+
+
+$curr_vendor = "";
+foreach($material_list as $key=>$value){
+	$curr_vendor = $value->supplier;
+	if(array_key_exists($curr_vendor, $vendor_list_ForPO)){
+		//$exiting_ven_mat_list = $vendor_list[$curr_vendor];
+		array_push($vendor_list_ForPO[$curr_vendor], ['Goods for Project',$key ,$value->siteID,$value->quantity,$value->uom,  
+		$value->unitPrice,$value->totalPrice,$value->Account, $projectID, $value->Task , $value->department, 'Yes', 'Not Received', 'Not Vouchered',
+		'', $value->manu, $value->descrip, $value->supplier ]);
+	}else{
+		$vend = New Vendor();
+		$vend->vendorName = $curr_vendor;
+		array_push($vend->materialList, ['Goods for Project',$key ,$value->siteID,$value->quantity,$value->uom,  $value->unitPrice,
+		$value->totalPrice,$value->Account, $projectID, $value->Task , $value->department, 'Yes', 'Not Received', 'Not Vouchered',
+		'', $value->manu, $value->descrip, $value->supplier ]);
+		$vendor_list_ForPO[$curr_vendor] = $vend->materialList;
+		
+	}
+}
+//var_dump($material_list);
+
+//var_dump($vendor_list);
+
+
+
+
+/** Create a new Spreadsheet Object **/
+//A new workbook will always be created with a single worksheet.
+$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+
+// CREATE A NEW SPREADSHEET ANOTHER METHOD
+//$spreadsheet = new Spreadsheet();
+
+$sheet = $spreadsheet->getActiveSheet();
+$sheet->setTitle('Estimate');
+$drawing = new \PhpOffice\PhpSpreadsheet\Worksheet\Drawing();
+$drawing->setName('PEClogo');
+$drawing->setDescription('PEClogo');
+$drawing->setPath('images/peclogo.jpg');
+$drawing->setCoordinates('A1');
+ $drawing->setWidthAndHeight(125, 125);
+/* $drawing->setOffsetX(110);
+ $drawing->setRotation(25);
+$drawing->getShadow()->setVisible(true);
+$drawing->getShadow()->setDirection(45); */
+$drawing->setWorksheet($spreadsheet->getActiveSheet());
+
+
+$sheet->getTabColor()->setRGB('00FF00');
+$sheet->setCellValue('A5',"ProjectID :"); $sheet->setCellValue('B5',$projectID);
+$sheet->setCellValue('A6', "Stage :");   $sheet->setCellValue('B6', $stage);
+$sheet->setCellValue('A7', "Version :");   $sheet->setCellValue('B7', $version);
+$sheet->setCellValue('A8', "Type :");   $sheet->setCellValue('B8', $estimateType);
+$sheet->setCellValue('D5', "Client :");   $sheet->setCellValue('E5', $ClientNumber);
+$sheet->setCellValue('D6', "Description :"); $sheet->setCellValue('E6',$Description);
+$sheet->setCellValue('D7', "Address :");   $sheet->setCellValue('E7', $Address);
+$sheet->setCellValue('D8', "Date Created :");   $sheet->setCellValue('E8', $DateCreated);
+$sheet->setCellValue('G5', "Contractor :");   $sheet->setCellValue('H5', $Contractor);
+$sheet->setCellValue('G6', "Supplier :"); $sheet->setCellValue('H6', $MaterialSupplier);
+$sheet->setCellValue('G7', "Designer :");   $sheet->setCellValue('H7', $Designer);
+$sheet->setCellValue('G8', "Project Manager :");   $sheet->setCellValue('H8', $ProjectManager);
+$spreadsheet->getActiveSheet()->getStyle('A5:H8')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A5:H8')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK); 
+
+$sheet->setCellValue('A10', "DISPLAY ALL NUMBERS FOR TESTING");
+$spreadsheet->getActiveSheet()->getStyle('A10')->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'DC143C' ], 
+	  'font'  => [ 'bold' => true]] );
+$sheet->setCellValue('A11', "Struc M Cost :");   $sheet->setCellValue('B11', $Struc_M_Cost);
+$sheet->setCellValue('A12', "Struc L Cost :");   $sheet->setCellValue('B12', $Struc_L_Cost);
+$sheet->setCellValue('A13', "Material Cost :");   $sheet->setCellValue('B13', $Material_Cost);
+$sheet->setCellValue('A14', "Labour Cost :");   $sheet->setCellValue('B14', $Labour_Cost);
+//$sheet->setCellValue('A15', "Permit M Cost :");   $sheet->setCellValue('B15', $Permit_M_Cost);
+$sheet->setCellValue('A16', "Permit  Cost :");   $sheet->setCellValue('B16', $Permit_L_Cost + $Permit_M_Cost);
+$sheet->setCellValue('A17', "Extra Cost :");   $sheet->setCellValue('B17', $Extra_M_Cost + $Extra_L_Cost);
+//$sheet->setCellValue('A18', "Extra L Cost :");   $sheet->setCellValue('B18', $Extra_L_Cost);
+$sheet->setCellValue('A19', "Quote Cost:");   $sheet->setCellValue('B19', $Quote_Cost);
+$sheet->setCellValue('A20', "Eng D Cost :");   $sheet->setCellValue('B20', $Eng_D_Cost);
+$sheet->setCellValue('A21', "Eng P Cost :");   $sheet->setCellValue('B21', $Eng_P_Cost);
+
+$tCost = $Eng_P_Cost + $Eng_D_Cost + $Struc_M_Cost + $Struc_L_Cost + $Permit_L_Cost + $Permit_M_Cost + $Extra_M_Cost+ $Extra_L_Cost + $Quote_Cost + $Material_Cost + $Labour_Cost;
+$sheet->setCellValue('A23', "Sum of all Costs :");   
+$sheet->setCellValue('B23', $tCost );
+
+$sheet->setCellValue('A25', "EPC COST %:");   $sheet->setCellValue('B25', $tCost * $epc_cost_per);
+$sheet->setCellValue('A26', "EPC CHEVY %:");   $sheet->setCellValue('B26', $tCost * $epc_chevy_per);
+
+$sheet->setCellValue('A28', "EPC Sec Cost :");   $sheet->setCellValue('B28', $EPC_Sec_TotalCost); 
+
+$sheet->setCellValue('A30', "NEW WAY OF DOING ESTIMATE");
+$spreadsheet->getActiveSheet()->getStyle('A30')->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'DC143C' ], 
+	  'font'  => [ 'bold' => true]] );
+$sheet->setCellValue('B30', "MarkUp is ".$markup_percentage." and Contingency is ".$contingency_percentage.
+"; MarkUp for XTask is ".$markup_percentage_xtask." and Contingency for XTask is ".$contingency_percentage_xtask.
+"; MarkUp for MTask is ".$markup_percentage_mtask." and Contingency for MTask is ".$contingency_percentage_mtask.
+"; MarkUp for CTask is ".$markup_percentage_ctask." and Contingency for CTask is ".$contingency_percentage_ctask
+);
+$spreadsheet->getActiveSheet()->getStyle('A30:B30')->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'DC143C' ], 
+	  'font'  => [ 'bold' => true]] );
+	  
+$engeeringTotal = $Eng_D_Cost+ $Eng_P_Cost + $Quote_Cost;
+$engContingency = ($engeeringTotal * $contingency_percentage);
+$engContingencyTotal = ($engeeringTotal * $contingency_percentage) + $engeeringTotal;
+$engConTotMark = $engContingencyTotal * $markup_percentage;
+
+$CLab = $Struc_L_Cost + $Labour_Cost;
+$CLabContingency = ($CLab * $contingency_percentage_ctask);
+$CLabContingencyTotal =  $CLabContingency + $CLab;
+$CLabContingencyTotalMark = $CLabContingencyTotal * $markup_percentage_ctask;
+
+$Xtotal = $Permit_L_Cost + $Permit_M_Cost + $Extra_M_Cost+ $Extra_L_Cost;
+$XCon = ($Xtotal * $contingency_percentage_xtask);
+$XConTotal = $Xtotal + $XCon;
+$XConTotalMark = $XConTotal * $markup_percentage_xtask;
+
+$MTotal = $Struc_M_Cost + $Material_Cost;
+$MCon = ($MTotal * $contingency_percentage_mtask);
+$MConTotal = $MCon +  $MTotal;
+$MConTotalMark = $MConTotal * $markup_percentage_mtask;
+
+//Added Dec 21 --- include gross margin for both cost and contingency cols.
+$sheet->setCellValue('B31', "Amount");
+$sheet->setCellValue('C31', "Gross Margin");$sheet->setCellValue('D31', "Contingency");$sheet->setCellValue('E31', "Sub-Total w/ Contingency");
+$sheet->setCellValue('F31', "Gross Margin w/ Contingency");$sheet->setCellValue('G31', "Markup");$sheet->setCellValue('H31', "Total Quotation");
+
+$sheet->setCellValue('A32', "Engineering :");   $sheet->setCellValue('B32', $engeeringTotal); 
+if(($engContingencyTotal + $engConTotMark) > 0.0){
+	$sheet->setCellValue('C32', ($engContingencyTotal + $engConTotMark - $engeeringTotal)/($engContingencyTotal + $engConTotMark));
+}else{
+	$sheet->setCellValue('C32', 0.0);
+}
+$sheet->setCellValue('D32', $engContingency); $sheet->setCellValue('E32', $engContingencyTotal); 
+if(($engContingencyTotal + $engConTotMark) > 0.0){
+	$sheet->setCellValue('F32', ($engContingencyTotal + $engConTotMark - $engContingencyTotal)/($engContingencyTotal + $engConTotMark)); 
+}else{
+	$sheet->setCellValue('F32', 0.0); 
+}
+$sheet->setCellValue('G32', $engConTotMark);$sheet->setCellValue('H32', $engContingencyTotal + $engConTotMark);  
+
+$total_revenue +=  $engContingencyTotal + $engConTotMark;
+
+$sheet->setCellValue('A33', "X Task :");   $sheet->setCellValue('B33', $Xtotal);
+if(($XConTotal + $XConTotalMark) > 0.0){
+	$sheet->setCellValue('C33', ($XConTotal + $XConTotalMark - $Xtotal)/($XConTotal + $XConTotalMark)); 
+}else {
+	$sheet->setCellValue('C33', 0.0); 
+}
+
+$sheet->setCellValue('D33', $XCon); $sheet->setCellValue('E33', $XConTotal);
+if( ($XConTotal + $XConTotalMark) > 0.0){
+	$sheet->setCellValue('F33', ($XConTotal + $XConTotalMark - $XConTotal)/($XConTotal + $XConTotalMark));  
+} else{
+	$sheet->setCellValue('F33', 0.0);  
+}
+
+$sheet->setCellValue('G33', $XConTotalMark); 
+$sheet->setCellValue('H33', $XConTotal + $XConTotalMark);
+$total_revenue += $XConTotal + $XConTotalMark;
+
+$sheet->setCellValue('A34', "M Task Material :");  $sheet->setCellValue('B34', $MTotal); 
+if(($MConTotal + $MConTotalMark) > 0.0){
+	$sheet->setCellValue('C34', ($MConTotal + $MConTotalMark - $MTotal)/($MConTotal + $MConTotalMark)); 
+}else {
+	$sheet->setCellValue('C34', 0.0); 
+}
+
+$sheet->setCellValue('D34', $MCon); $sheet->setCellValue('E34', $MConTotal); 
+if(($MConTotal + $MConTotalMark) > 0.0){
+	$sheet->setCellValue('F34', ($MConTotal + $MConTotalMark - $MConTotal)/($MConTotal + $MConTotalMark));
+}else {
+	$sheet->setCellValue('F34', 0.0);
+}
+ 
+$sheet->setCellValue('G34', $MConTotalMark);
+$sheet->setCellValue('H34', $MConTotal + $MConTotalMark);
+$total_revenue += $MConTotal + $MConTotalMark;
+
+$sheet->setCellValue('A35', "C Task Labour :");   $sheet->setCellValue('B35', $CLab); 
+if(($CLabContingencyTotal + $CLabContingencyTotalMark) > 0.0){
+	$sheet->setCellValue('C35', ($CLabContingencyTotal + $CLabContingencyTotalMark - $CLab)/($CLabContingencyTotal + $CLabContingencyTotalMark));
+}else{
+	$sheet->setCellValue('C35', 0.0);
+}
+ 
+$sheet->setCellValue('D35', $CLabContingency); $sheet->setCellValue('E35', $CLabContingencyTotal);
+if(($CLabContingencyTotal + $CLabContingencyTotalMark) > 0.0){
+	$sheet->setCellValue('F35', ($CLabContingencyTotal + $CLabContingencyTotalMark - $CLabContingencyTotal)/($CLabContingencyTotal + $CLabContingencyTotalMark)); 
+} else{
+	$sheet->setCellValue('F35', 0.0); 
+}
+
+$sheet->setCellValue('G35', $CLabContingencyTotalMark);
+$sheet->setCellValue('H35', $CLabContingencyTotal + $CLabContingencyTotalMark);
+$total_revenue +=  $CLabContingencyTotal + $CLabContingencyTotalMark; 
+
+//Added Dec 21 --- SHow totals and percentages for each category
+$sheet->setCellValue('A36', "Totals"); 
+$sheet->setCellValue('B36', $engeeringTotal + $Xtotal + $MTotal + $CLab); 
+if($total_revenue > 0.0){
+	$sheet->setCellValue('C36', ($total_revenue - ($engeeringTotal + $Xtotal + $MTotal + $CLab))/$total_revenue); 
+}else{
+	$sheet->setCellValue('C36', 0.0); 
+}
+$sheet->setCellValue('D36', $XCon + $MCon + $CLabContingency + $engContingency); $sheet->setCellValue('E36', $engContingencyTotal + $XConTotal + $MConTotal + $CLabContingencyTotal);
+if($total_revenue > 0.0){
+	$sheet->setCellValue('F36', ($total_revenue - ($engContingencyTotal + $XConTotal + $MConTotal + $CLabContingencyTotal))/$total_revenue);
+}else {
+	$sheet->setCellValue('F36', 0.0);
+}
+
+$sheet->setCellValue('G36', $engConTotMark + $XConTotalMark + $MConTotalMark + $CLabContingencyTotalMark);
+$sheet->setCellValue('H36', $total_revenue); 
+/* old way for rev calculation by embeding formulas
+//$sheet->setCellValue('F36','=SUM(F32:F35)');
+//$sheet->setCellValue('A37', "Revenue"); 
+//$total_revenue = $sheet->getCell('F36')->getCalculatedValue();*/
+$spreadsheet->getActiveSheet()->getStyle('B10:H37')->getNumberFormat()->setFormatCode('$ #,##0.00');
+
+//DEC 21 ADDED NEW STYLES
+$spreadsheet->getActiveSheet()->getStyle('C32:C36')->getNumberFormat()->setFormatCode('[black][>= 0] 0.00 %;[Red][<0] 0.00 %; 0');
+$spreadsheet->getActiveSheet()->getStyle('F32:F36')->getNumberFormat()->setFormatCode('[black][>= 0] 0.00 %;[Red][<0] 0.00 %; 0');
+
+$spreadsheet->getActiveSheet()->getStyle('A31:H31')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A31:H31')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A31:H31')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+$spreadsheet->getActiveSheet()->getStyle('B31:H31')->getAlignment()->setHorizontal('right');
+$spreadsheet->getActiveSheet()->getColumnDimension('E')->setAutoSize(true);
+$spreadsheet->getActiveSheet()->getColumnDimension('F')->setAutoSize(true);
+
+$rowCounter = 38;
+$sheet->setCellValue('A'.$rowCounter, "STRUCTURES");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'DC143C' ], 
+	  'font'  => [ 'bold' => true]] );
+$rowCounter++;
+	$sheet->setCellValue('A'.$rowCounter, "StructurID");
+	$sheet->setCellValue('B'.$rowCounter, "Description");
+	$sheet->setCellValue('C'.$rowCounter, "Quantity");
+	$sheet->setCellValue('D'.$rowCounter, "Material Costs ($)");
+	$sheet->setCellValue('E'.$rowCounter, "Labour Costs ($)");
+	$sheet->setCellValue('F'.$rowCounter, "Complexity Factor");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':F'.$rowCounter.'')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':F'.$rowCounter.'')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':F'.$rowCounter.'')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+$rowCounter++;
+foreach($proj_struc as $lineItem){
+	$sheet->setCellValue('A'.$rowCounter, $lineItem[0]);
+	$sheet->setCellValue('B'.$rowCounter, $lineItem[1]);
+	$sheet->setCellValue('C'.$rowCounter, $lineItem[2]);
+	$sheet->setCellValue('D'.$rowCounter, $lineItem[3]);
+	$sheet->setCellValue('E'.$rowCounter, $lineItem[4]);
+	$sheet->setCellValue('F'.$rowCounter, $lineItem[5]);
+	$rowCounter++;
+}
+$sheet->setCellValue('A'.$rowCounter, "Total");
+$sheet->setCellValue('D'.$rowCounter, $Struc_M_Cost);
+$sheet->setCellValue('E'.$rowCounter, $Struc_L_Cost); 
+
+
+$rowCounter = $rowCounter + 2;
+$sheet->setCellValue('A'.$rowCounter, "MATERIALS");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'DC143C' ], 
+	  'font'  => [ 'bold' => true]] );
+$rowCounter++;
+$sheet->setCellValue('A'.$rowCounter, "itemNumber");
+$sheet->setCellValue('B'.$rowCounter, "Description");
+$sheet->setCellValue('C'.$rowCounter, "Quantity");
+$sheet->setCellValue('D'.$rowCounter, "Unit Cost ($)");
+$sheet->setCellValue('E'.$rowCounter, "Material Costs ($)");
+$sheet->setCellValue('F'.$rowCounter, "UoM");
+$sheet->setCellValue('G'.$rowCounter, "Task");
+$sheet->setCellValue('H'.$rowCounter, "Acct");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':H'.$rowCounter.'')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':H'.$rowCounter.'')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':H'.$rowCounter.'')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+$rowCounter++;
+foreach($proj_mat as $lineItem){
+	$sheet->setCellValue('A'.$rowCounter, $lineItem[0]);
+	$sheet->setCellValue('B'.$rowCounter, $lineItem[1]);
+	$sheet->setCellValue('C'.$rowCounter, $lineItem[2]);
+	$sheet->setCellValue('D'.$rowCounter, $lineItem[3]);
+	$sheet->setCellValue('E'.$rowCounter, $lineItem[4]);
+	$sheet->setCellValue('F'.$rowCounter, $lineItem[5]);
+	$sheet->setCellValue('G'.$rowCounter, $lineItem[6]);
+	$sheet->setCellValue('H'.$rowCounter, $lineItem[7]);
+	$rowCounter++;
+}
+$sheet->setCellValue('A'.$rowCounter, "Total");
+$sheet->setCellValue('E'.$rowCounter, $Material_Cost); 
+
+
+$rowCounter = $rowCounter + 2;
+$sheet->setCellValue('A'.$rowCounter, "LABOUR");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'DC143C' ], 
+	  'font'  => [ 'bold' => true]] );
+	  
+$rowCounter++;
+$sheet->setCellValue('A'.$rowCounter, "Labour Unit");
+$sheet->setCellValue('B'.$rowCounter, "Description");
+$sheet->setCellValue('C'.$rowCounter, "Quantity");
+$sheet->setCellValue('D'.$rowCounter, "Unit Cost ($)");
+$sheet->setCellValue('E'.$rowCounter, "Labour Costs($)");
+$sheet->setCellValue('F'.$rowCounter, "UoM");
+$sheet->setCellValue('G'.$rowCounter, "Complexity Factor");
+$sheet->setCellValue('H'.$rowCounter, "Task");
+$sheet->setCellValue('I'.$rowCounter, "Acct");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':I'.$rowCounter.'')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':I'.$rowCounter.'')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':I'.$rowCounter.'')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+$rowCounter++;
+foreach($proj_lab as $lineItem){
+	$sheet->setCellValue('A'.$rowCounter, $lineItem[0]);
+	$sheet->setCellValue('B'.$rowCounter, $lineItem[1]);
+	$sheet->setCellValue('C'.$rowCounter, $lineItem[2]);
+	$sheet->setCellValue('D'.$rowCounter, $lineItem[3]);
+	$sheet->setCellValue('E'.$rowCounter, $lineItem[4]);
+	$sheet->setCellValue('F'.$rowCounter, $lineItem[5]);
+	$sheet->setCellValue('G'.$rowCounter, $lineItem[6]);
+	$sheet->setCellValue('H'.$rowCounter, $lineItem[7]);
+	$sheet->setCellValue('I'.$rowCounter, $lineItem[8]);
+	
+	$rowCounter++;
+}
+$sheet->setCellValue('A'.$rowCounter, "Total");
+$sheet->setCellValue('E'.$rowCounter, $Labour_Cost); 
+
+
+$rowCounter = $rowCounter + 2;
+$sheet->setCellValue('A'.$rowCounter, "EXTRA COST SECTION");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'DC143C' ], 
+	  'font'  => [ 'bold' => true]] );
+$rowCounter++;
+$sheet->setCellValue('A'.$rowCounter, "Vendor");
+$sheet->setCellValue('B'.$rowCounter, "Description");
+$sheet->setCellValue('C'.$rowCounter, "Quantity");
+$sheet->setCellValue('D'.$rowCounter, "Unit Cost ($)");
+$sheet->setCellValue('E'.$rowCounter, "Total Costs($)");
+$sheet->setCellValue('F'.$rowCounter, "UoM");
+$sheet->setCellValue('G'.$rowCounter, "Task");
+$sheet->setCellValue('H'.$rowCounter, "Acct");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':H'.$rowCounter.'')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':H'.$rowCounter.'')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':H'.$rowCounter.'')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+$rowCounter++;
+foreach($proj_extra as $lineItem){
+	$sheet->setCellValue('A'.$rowCounter, $lineItem[0]);
+	$sheet->setCellValue('B'.$rowCounter, $lineItem[1]);
+	$sheet->setCellValue('C'.$rowCounter, $lineItem[2]);
+	$sheet->setCellValue('D'.$rowCounter, $lineItem[3]);
+	$sheet->setCellValue('E'.$rowCounter, $lineItem[4]);
+	$sheet->setCellValue('F'.$rowCounter, $lineItem[5]);
+	$sheet->setCellValue('G'.$rowCounter, $lineItem[6]);
+	$sheet->setCellValue('H'.$rowCounter, $lineItem[7]);
+	$rowCounter++;
+}
+$sheet->setCellValue('A'.$rowCounter, "Total");
+$sheet->setCellValue('E'.$rowCounter, $Extra_L_Cost + $Extra_M_Cost); 
+
+$rowCounter = $rowCounter + 2;
+$sheet->setCellValue('A'.$rowCounter, "PERMITS SECTION");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'DC143C' ], 
+	  'font'  => [ 'bold' => true]] );
+$rowCounter++;
+$sheet->setCellValue('A'.$rowCounter, "Vendor");
+$sheet->setCellValue('B'.$rowCounter, "Description");
+$sheet->setCellValue('C'.$rowCounter, "Quantity");
+$sheet->setCellValue('D'.$rowCounter, "Unit Cost ($)");
+$sheet->setCellValue('E'.$rowCounter, "Total Costs($)");
+$sheet->setCellValue('F'.$rowCounter, "UoM");
+$sheet->setCellValue('G'.$rowCounter, "Task");
+$sheet->setCellValue('H'.$rowCounter, "Acct");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':H'.$rowCounter.'')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':H'.$rowCounter.'')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':H'.$rowCounter.'')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+$rowCounter++;
+foreach($proj_permits as $lineItem){
+	$sheet->setCellValue('A'.$rowCounter, $lineItem[0]);
+	$sheet->setCellValue('B'.$rowCounter, $lineItem[1]);
+	$sheet->setCellValue('C'.$rowCounter, $lineItem[2]);
+	$sheet->setCellValue('D'.$rowCounter, $lineItem[3]);
+	$sheet->setCellValue('E'.$rowCounter, $lineItem[4]);
+	$sheet->setCellValue('F'.$rowCounter, $lineItem[5]);
+	$sheet->setCellValue('G'.$rowCounter, $lineItem[6]);
+	$sheet->setCellValue('H'.$rowCounter, $lineItem[7]);
+	$rowCounter++;
+}
+$sheet->setCellValue('A'.$rowCounter, "Total");
+$sheet->setCellValue('E'.$rowCounter, $Permit_M_Cost + $Permit_L_Cost); 
+$spreadsheet->getActiveSheet()->getStyle('D38:E'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+
+$rowCounter = $rowCounter + 2;
+$sheet->setCellValue('A'.$rowCounter, "ENGINEERING SECTION");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'DC143C' ], 
+	  'font'  => [ 'bold' => true]] );
+$rowCounter++;
+$sheet->setCellValue('A'.$rowCounter, "Resource");
+$sheet->setCellValue('B'.$rowCounter, "Hours");
+$sheet->setCellValue('C'.$rowCounter, "Unit Cost ($)");
+$sheet->setCellValue('D'.$rowCounter, "Total Costs($)");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':D'.$rowCounter.'')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':D'.$rowCounter.'')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':D'.$rowCounter.'')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+$rowCounter++;
+$start = $rowCounter;
+$addEng = 0.0;
+
+foreach($proj_eng as $lineItem){
+	$sheet->setCellValue('A'.$rowCounter, $lineItem[0]);
+	$sheet->setCellValue('B'.$rowCounter, $lineItem[1]);
+	$sheet->setCellValue('C'.$rowCounter, $lineItem[2]);
+	$sheet->setCellValue('D'.$rowCounter, $lineItem[3]);
+	$addEng += $lineItem[3];
+	$rowCounter++;
+}
+$sheet->setCellValue('A'.$rowCounter, "Total");
+$sheet->setCellValue('D'.$rowCounter, $addEng);
+$engTotal = $addEng;
+$rowCounter++;
+$engTotalDis = $engTotal * 0.05;
+$sheet->setCellValue('A'.$rowCounter, "Disbursements");
+$sheet->setCellValue('D'.$rowCounter, $engTotalDis );  
+$rowCounter++;
+$sheet->setCellValue('A'.$rowCounter, "Total with Disbursements");
+$sheet->setCellValue('D'.$rowCounter, $engTotalDis + $engTotal);
+$rowCounter++;  
+$spreadsheet->getActiveSheet()->getStyle('C'.$start.':D'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+
+
+$rowCounter = $rowCounter + 2;
+$sheet->setCellValue('A'.$rowCounter, "EPC SECTION");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'DC143C' ], 
+	  'font'  => [ 'bold' => true]] );
+$rowCounter++;
+$sheet->setCellValue('A'.$rowCounter, "Description");
+$sheet->setCellValue('B'.$rowCounter, "Quantity");
+$sheet->setCellValue('C'.$rowCounter, "Unit Cost ($)");
+$sheet->setCellValue('D'.$rowCounter, "Total Costs($)");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':D'.$rowCounter.'')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':D'.$rowCounter.'')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':D'.$rowCounter.'')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+$rowCounter++;
+$start = $rowCounter;
+$total_epc = 0.0;
+foreach($proj_epc as $lineItem){
+	$sheet->setCellValue('A'.$rowCounter, $lineItem[0]);
+	$sheet->setCellValue('B'.$rowCounter, $lineItem[1]);
+	$sheet->setCellValue('C'.$rowCounter, $lineItem[2]);
+	$sheet->setCellValue('D'.$rowCounter, $lineItem[3]);
+	$total_epc += $lineItem[3];
+	$rowCounter++;
+}
+$sheet->setCellValue('A'.$rowCounter, "Total");
+$sheet->setCellValue('D'.$rowCounter, $total_epc); 
+$spreadsheet->getActiveSheet()->getStyle('C'.$start.':D'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+
+
+$rowCounter = $rowCounter + 2;
+$sheet->setCellValue('A'.$rowCounter, "SHAW SECTION");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'DC143C' ], 
+	  'font'  => [ 'bold' => true]] );
+$rowCounter++;
+$sheet->setCellValue('A'.$rowCounter, "Description");
+$sheet->setCellValue('B'.$rowCounter, "Quantity");
+$sheet->setCellValue('C'.$rowCounter, "Shaw Fee ($)");
+$sheet->setCellValue('D'.$rowCounter, "Total Costs($)");
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':D'.$rowCounter.'')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':D'.$rowCounter.'')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter.':D'.$rowCounter.'')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+$rowCounter++;
+$start = $rowCounter;
+$total_shaw = 0.0;
+foreach($proj_shaw as $lineItem){
+	$sheet->setCellValue('A'.$rowCounter, $lineItem[0]);
+	$sheet->setCellValue('B'.$rowCounter, $lineItem[1]);
+	$sheet->setCellValue('C'.$rowCounter, $lineItem[2]);
+	$sheet->setCellValue('D'.$rowCounter, $lineItem[3]);
+	$total_shaw += $lineItem[3];
+	$rowCounter++;
+}
+$sheet->setCellValue('A'.$rowCounter, "Total");
+$sheet->setCellValue('D'.$rowCounter, $total_shaw); 
+$spreadsheet->getActiveSheet()->getStyle('C'.$start.':D'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+
+
+foreach (range('A','H') as $col) {
+	$spreadsheet->getActiveSheet()->getColumnDimension($col)->setWidth(20);
+} 
+
+// ==============================================================================================
+// Create a new worksheet called detailed master list
+$myWorkSheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, 'Detailed Material List');
+$myWorkSheet->getTabColor()->setRGB('7CCD7C');
+// Attach this worksheet in the Spreadsheet object.
+$spreadsheet->addSheet($myWorkSheet, 1);
+$spreadsheet->setActiveSheetIndex(1);
+$sheet = $spreadsheet->getActiveSheet();
+$sheet->setCellValue('A1','Legend');
+$spreadsheet->getActiveSheet()->getStyle('A1:B1')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A1:B1')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A1:B1')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+$sheet->setCellValue('A2','Blue:'); $sheet->setCellValue('B2','Dates has expired, and Price is not available, MUST use guess price');
+$spreadsheet->getActiveSheet()->getStyle('B2')->getFont()->applyFromArray( ['color' => [ 'rgb' => '0000FF' ] ] );
+$sheet->setCellValue('A3','Red'); $sheet->setCellValue('B3','Dates has expired, BUT Price is available');
+$spreadsheet->getActiveSheet()->getStyle('B3')->getFont()->applyFromArray( ['color' => [ 'rgb' => 'FF0000' ] ] );
+$sheet->setCellValue('A4','Pruple:'); $sheet->setCellValue('B4','Min qty is not met');
+$spreadsheet->getActiveSheet()->getStyle('B4')->getFont()->applyFromArray( ['color' => [ 'rgb' => '7D26CD' ] ] );
+$sheet->setCellValue('A5','Green:'); $sheet->setCellValue('B5','Date is valid');
+$spreadsheet->getActiveSheet()->getStyle('B5')->getFont()->applyFromArray( ['color' => [ 'rgb' => '006400' ] ] );
+
+$sheet->setCellValue('A6','Black:'); $sheet->setCellValue('B6','Data');
+$sheetHeaders = ["ItemNumber",	"Description", "UoM", "Manufacturer", "Part Number", "Supplier",  "Quantity", "Base Cost", "Estimate Cost", "Valid Date", "Guess Price", "Guess Estimate Cost", "Min. Qty to Order", "Min. Qty Notes", "Lead Time", "Lead Time in Days", "Min Qty Met"];
+$headerCounter = 1;
+foreach($sheetHeaders as $item){
+	$sheet->setCellValueByColumnAndRow($headerCounter, 8, $item);
+	$headerCounter++;
+}
+//$spreadsheet->getActiveSheet()->freezePaneByColumnAndRow(8,1);
+$spreadsheet->getActiveSheet()->getStyle('A8:Q8')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A8:Q8')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A8:Q8')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+	
+$rowCounter = 9;
+$curr_date = date("Y-m-d");
+$actualMatCost = 0.0;   
+$guessMatCost = 0.0;
+foreach($material_list as $key=>$value){
+	// printing values
+	$sheet->setCellValue('A'.$rowCounter, $key);
+	$sheet->setCellValue('B'.$rowCounter, $value->descrip);
+	$sheet->setCellValue('C'.$rowCounter, $value->uom);
+	$sheet->setCellValue('D'.$rowCounter, $value->manu);
+	$sheet->setCellValue('E'.$rowCounter, $value->partNum); 
+    $sheet->setCellValue('F'.$rowCounter, $value->supplier);
+	$sheet->setCellValue('G'.$rowCounter, $value->quantity);
+	$sheet->setCellValue('H'.$rowCounter, $value->unitPrice);
+	$sheet->setCellValue('I'.$rowCounter, $value->totalPrice);
+	$sheet->setCellValue('J'.$rowCounter, $value->validDate);
+	$sheet->setCellValue('K'.$rowCounter, $value->guessPrice);
+	$sheet->setCellValue('L'.$rowCounter, $value->totalGuessPrice);
+	$sheet->setCellValue('M'.$rowCounter, $value->minQtyOrder);
+	$sheet->setCellValue('N'.$rowCounter, $value->minQtyNotes);
+    $sheet->setCellValue('O'.$rowCounter, $value->LeadTime);
+	$sheet->setCellValue('P'.$rowCounter, $value->LeadTimeDays);
+	$miqty = false;
+	if(round($value->quantity,2) < $value->minQtyOrder){
+		$miqty = true;
+		$sheet->setCellValue('Q'.$rowCounter, "NO");
+		$spreadsheet->getActiveSheet()->getStyle('Q'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => '7D26CD' ] ] );
+	}else{
+		$sheet->setCellValue('Q'.$rowCounter, "YES");
+	}
+
+	
+	// formatting after print
+	$spreadsheet->getActiveSheet()->getStyle('K'.$rowCounter)->getNumberFormat()->setFormatCode('[Black]$ #,##0.00');
+	$spreadsheet->getActiveSheet()->getStyle('L'.$rowCounter)->getNumberFormat()->setFormatCode('[Black]$ #,##0.00');
+	if($value->validDate < $curr_date && $value->unitPrice <= 0.0){//  const COLOR_DARKRED = 'FF800000';
+		$spreadsheet->getActiveSheet()->getStyle('K'.$rowCounter)->getNumberFormat()->setFormatCode('[Blue]$ #,##0.00');
+		$spreadsheet->getActiveSheet()->getStyle('L'.$rowCounter)->getNumberFormat()->setFormatCode('[Blue]$ #,##0.00');
+		$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+		$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => 'FF0000' ] ] );
+		$spreadsheet->getActiveSheet()->getStyle('J'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => '0000FF' ] ] );
+		$guessMatCost += $value->totalGuessPrice;
+		// get sand, gravel and concrete prices..
+		if(trim($key) == "N561015007"){
+			$sand_total += $value->totalGuessPrice;
+		}else if(trim($key) == "N5610101002"){
+			$gravel_total += $value->totalGuessPrice;
+		}else if(trim($key) == "N961014003"){
+			$concrete_total += $value->totalGuessPrice;
+		} 
+	}else if($value->validDate < $curr_date && $value->unitPrice > 0.0){
+		$spreadsheet->getActiveSheet()->getStyle('H'.$rowCounter)->getNumberFormat()->setFormatCode('[Red]$ #,##0.00');
+		$spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter)->getNumberFormat()->setFormatCode('[Red]$ #,##0.00');
+		$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+		$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => 'FF0000' ] ] );
+		$spreadsheet->getActiveSheet()->getStyle('J'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => 'FF0000' ] ] );
+		$actualMatCost += $value->totalPrice;
+		// get sand, gravel and concrete prices..
+		if(trim($key) == "N561015007"){
+			$sand_total += $value->totalPrice;
+		}else if(trim($key) == "N5610101002"){
+			$gravel_total += $value->totalPrice;
+		}else if(trim($key) == "N961014003"){
+			$concrete_total += $value->totalPrice;
+		}
+	}else if($value->validDate > $curr_date){
+		$spreadsheet->getActiveSheet()->getStyle('H'.$rowCounter)->getNumberFormat()->setFormatCode('$ #,##0.00');
+		$spreadsheet->getActiveSheet()->getStyle('H'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => '006400' ] ] );
+		$spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter)->getNumberFormat()->setFormatCode('$ #,##0.00');
+		$spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => '006400' ] ] );
+		$spreadsheet->getActiveSheet()->getStyle('J'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => '006400' ] ] );
+		$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+		$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => '006400' ] ] );
+		$actualMatCost += $value->totalPrice;
+		// get sand, gravel and concrete prices..
+		if(trim($key) == "N561015007"){
+			$sand_total += $value->totalPrice;
+		}else if(trim($key) == "N5610101002"){
+			$gravel_total += $value->totalPrice;
+		}else if(trim($key) == "N961014003"){
+			$concrete_total += $value->totalPrice;
+		}
+	}
+	if($miqty){
+		$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => '7D26CD' ] ] );
+	}
+	
+	$rowCounter++;
+}
+
+$rowCounter++;
+$sheet->setCellValue('F'.$rowCounter, "Totals");
+$sheet->setCellValue('I'.$rowCounter, $actualMatCost);
+$spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+$spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter )->getFont()->applyFromArray( ['color' => [ 'rgb' => '000000' ] ] );
+
+$sheet->setCellValue('L'.$rowCounter, $guessMatCost);
+$spreadsheet->getActiveSheet()->getStyle('L'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+$spreadsheet->getActiveSheet()->getStyle('L'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => '0000FF' ] ] );
+
+$rowCounter++;
+$sheet->setCellValue('F'.$rowCounter, "Total Material Cost");
+$sheet->setCellValue('I'.$rowCounter, $actualMatCost + $guessMatCost);
+$spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+$spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter )->getFont()->applyFromArray( ['color' => [ 'rgb' => '000000' ] ] );
+$spreadsheet->getActiveSheet()->mergeCells('I'.$rowCounter.':L'.$rowCounter.'');
+$spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter)->getAlignment()->applyFromArray([ 'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'textRotation' => 0, 'wrapText' => TRUE ]);
+$spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter)->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('CCE5FF');
+
+
+
+foreach (range('A','Q') as $col) {
+  $spreadsheet->getActiveSheet()->getColumnDimension($col)->setWidth(25);
+}
+
+
+//==============================================================================================================
+
+$myWorkSheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, $sheetname.' Material List Export');
+$myWorkSheet->getTabColor()->setRGB('87CEFA');
+$spreadsheet->addSheet($myWorkSheet, 2);
+$spreadsheet->setActiveSheetIndex(2);
+$sheet = $spreadsheet->getActiveSheet();
+$sheet->setCellValue('A1','Material List');
+$sheet->setCellValue('A2','Company:'); $sheet->setCellValue('B2','Primary Engineering & Construction');
+$sheet->setCellValue('A3','Project ID:'); $sheet->setCellValue('B3', $projectID);
+$sheet->setCellValue('A4','Project Description:'); $sheet->setCellValue('B4', $Description);
+$sheet->setCellValue('A5','Designer:'); $sheet->setCellValue('B5', $Designer);
+$sheet->setCellValue('A6','PM:'); $sheet->setCellValue('B6', $ProjectManager);
+
+$sheetHeaders = ["Item #", "Description", "Quantity",  "UoM",  "Manufacturer", "Part No."];
+$headerCounter = 1;
+foreach($sheetHeaders as $item){
+	$sheet->setCellValueByColumnAndRow($headerCounter, 8, $item);
+	$headerCounter++;
+}
+$rowCounter = 9;
+foreach($material_list as $key=>$value){
+	$sheet->setCellValue('A'.$rowCounter, $key);
+	$sheet->setCellValue('B'.$rowCounter, $value->descrip);
+	$sheet->setCellValue('C'.$rowCounter, $value->quantity);
+	$sheet->setCellValue('D'.$rowCounter, $value->uom);
+	$sheet->setCellValue('E'.$rowCounter, $value->manu);
+	$sheet->setCellValue('F'.$rowCounter, $value->partNum); 
+	
+	$spreadsheet->getActiveSheet()->getStyle('C'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+	$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => '000000' ] ] );
+	$rowCounter++;
+}
+foreach (range('A','F') as $col) {
+  $spreadsheet->getActiveSheet()->getColumnDimension($col)->setAutoSize(true);
+}
+$spreadsheet->getActiveSheet()->freezePaneByColumnAndRow(8,9);
+$spreadsheet->getActiveSheet()->getStyle('A8:F8')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A8:F8')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A8:F8')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+
+
+// ==========================================================================================
+$myWorkSheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, 'Material List By Vendor');
+$myWorkSheet->getTabColor()->setRGB('FFB90F');
+$spreadsheet->addSheet($myWorkSheet, 3);
+$spreadsheet->setActiveSheetIndex(3);
+$sheet = $spreadsheet->getActiveSheet();
+
+$rowCounter = 2;
+$sheetHeaders = ["Item #", "Description", "Quantity",  "UoM",  "Base Price", "Estimate Cost"];
+
+foreach($vendor_list as $venObj=>$value){
+	$sheet->setCellValue('A'.$rowCounter, $venObj);
+	$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => '006400' ] ] );
+	$sheet->setCellValue('B'.$rowCounter, "Item #");
+	$sheet->setCellValue('C'.$rowCounter, "Description");
+	$sheet->setCellValue('D'.$rowCounter, "Quantity");
+	$sheet->setCellValue('E'.$rowCounter, "UoM");
+	$sheet->setCellValue('F'.$rowCounter, "Unit Cost");
+	$sheet->setCellValue('G'.$rowCounter, "Estimate Cost"); 
+ 	
+	$spreadsheet->getActiveSheet()->getStyle('B'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('B'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('B'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');
+	$spreadsheet->getActiveSheet()->getStyle('C'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('C'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('C'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0'); 
+	$spreadsheet->getActiveSheet()->getStyle('D'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('D'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('D'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0'); 
+	$spreadsheet->getActiveSheet()->getStyle('E'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('E'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('E'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0'); 
+	$spreadsheet->getActiveSheet()->getStyle('F'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('F'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('F'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0'); 
+	$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0'); 	
+	$rowCounter++; $ind_vend_total = 0.0;
+	foreach($value as $arr){
+ 		$sheet->setCellValue('B'.$rowCounter, $arr[0]);
+		$sheet->setCellValue('C'.$rowCounter, $arr[1]);
+		$sheet->setCellValue('D'.$rowCounter, $arr[2]);
+		$sheet->setCellValue('E'.$rowCounter, $arr[3]);
+		$sheet->setCellValue('F'.$rowCounter, $arr[4]);
+		$spreadsheet->getActiveSheet()->getStyle('F'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+		$sheet->setCellValue('G'.$rowCounter, $arr[5]);	
+		$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+		$ind_vend_total += $arr[5];
+		$rowCounter++;
+	}
+	$sheet->setCellValue('A'.$rowCounter, "Vendor Total");
+	$spreadsheet->getActiveSheet()->getStyle('A'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => '006400' ] ] );
+	$sheet->setCellValue('G'.$rowCounter, $ind_vend_total);	
+	$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getNumberFormat()->setFormatCode('#,##0.00');
+	$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getFont()->applyFromArray( ['color' => [ 'rgb' => '006400' ] ] );
+	$rowCounter = $rowCounter + 2;
+}
+
+foreach (range('A','G') as $col) {
+  $spreadsheet->getActiveSheet()->getColumnDimension($col)->setWidth(25);  
+}
+
+
+// ================================== Budget Entry Screen ========================================================
+/*  N5610101002, N561015007, N961014003 items to remove from material list and add them to extra cost items for budget entry report col I and col L for my detailed material report*/
+
+$myWorkSheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, 'Budget Entry Report');
+$myWorkSheet->getTabColor()->setRGB('FF6666');
+$spreadsheet->addSheet($myWorkSheet, 4);
+$spreadsheet->setActiveSheetIndex(4);
+$sheet = $spreadsheet->getActiveSheet();
+
+$sheetHeaders = ["Task", "Account", "Flexible Budget Units", "Rate","Value ($)"];
+$headerCounter = 1;
+foreach($sheetHeaders as $item){
+	$sheet->setCellValueByColumnAndRow($headerCounter, 1, $item);
+	$headerCounter++;
+}
+$engeeringTotal = $Eng_D_Cost+ $Eng_P_Cost + $Quote_Cost;
+$eng_Contingency_Cost = ($engeeringTotal * $contingency_percentage);
+
+$CLab = $Struc_L_Cost + $Labour_Cost;
+$CLab_Contingency_Cost = ($CLab * $contingency_percentage_ctask);
+
+$Xtotal = $Permit_L_Cost + $Permit_M_Cost + $Extra_M_Cost+ $Extra_L_Cost;
+$X_Con_Cost = ($Xtotal * $contingency_percentage_xtask);
+
+$MTotal = $Struc_M_Cost + $Material_Cost;
+$M_Con_Cost = ($MTotal * $contingency_percentage_mtask);
+
+$sheet->setCellValue('A2', "P");   $sheet->setCellValue('B2', "REVENUE"); 		$sheet->setCellValue('E2',$total_revenue); $sheet->setCellValue('D2', 1);
+$sheet->setCellValue('A3', "Q");   $sheet->setCellValue('B3', "LABOUR"); 		$sheet->setCellValue('E3',$Quote_Cost);    $sheet->setCellValue('D3', 1);
+$sheet->setCellValue('A4', "P");   $sheet->setCellValue('B4', "LABOUR"); 		$sheet->setCellValue('E4',$Eng_P_Cost);    $sheet->setCellValue('D4', 1);
+$sheet->setCellValue('A5', "D");   $sheet->setCellValue('B5', "LABOUR"); 		$sheet->setCellValue('E5',$Eng_D_Cost);    $sheet->setCellValue('D5', 1);
+//$sheet->setCellValue('A6', "M");   $sheet->setCellValue('B6', "MATERIALS"); 	$sheet->setCellValue('E6', $Struc_M_Cost + $Material_Cost - ($sand_total + $gravel_total)); $sheet->setCellValue('D6', 1);
+$sheet->setCellValue('A6', "C");   $sheet->setCellValue('B6', "LABOUR"); 		$sheet->setCellValue('E6',$Labour_Cost + $Struc_L_Cost);  $sheet->setCellValue('D6', 1);
+$sheet->setCellValue('A7', "CC");  $sheet->setCellValue('B7', "CONTINGENCY");   $sheet->setCellValue('E7', $eng_Contingency_Cost + $CLab_Contingency_Cost + $X_Con_Cost + $M_Con_Cost); $sheet->setCellValue('D7', 1);
+$heavyEquip_total = 0.0;
+$rowCounter = 8;
+foreach($proj_extra_report as $lineItem){
+	//if(substr(trim($lineItem[1]), 0, 5) == "50058"){
+		//$heavyEquip_total += $lineItem[4];
+	//}else{
+		Switch(trim($lineItem[0])){
+			case "50028":
+				$sheet->setCellValue('A'.$rowCounter, "M"); 
+				$sheet->setCellValue('B'.$rowCounter, "MATERIALS"); 
+				$sheet->setCellValue('E'.$rowCounter, $lineItem[1] + $Struc_M_Cost);
+				break;
+			case "50034":
+				$sheet->setCellValue('A'.$rowCounter, "X"); 
+				$sheet->setCellValue('B'.$rowCounter, "SURVEY"); 
+				$sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+				break;
+			case "50036":
+				 $sheet->setCellValue('A'.$rowCounter, "X"); 
+				 $sheet->setCellValue('B'.$rowCounter, "CONSTRUCTION"); 
+				 $sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+			   break;
+			case "50038":
+				 $sheet->setCellValue('A'.$rowCounter, "X"); 
+				 $sheet->setCellValue('B'.$rowCounter, "TESTING"); 
+				 $sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+				break;
+			case "50039":
+				 $sheet->setCellValue('A'.$rowCounter, "X"); 
+				 $sheet->setCellValue('B'.$rowCounter, "COMPACTION"); 
+				 $sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+			   break;
+			case "50040":
+				 $sheet->setCellValue('A'.$rowCounter, "X"); 
+				 $sheet->setCellValue('B'.$rowCounter, "CONCRETE"); 
+				 $sheet->setCellValue('E'.$rowCounter, ($lineItem[1] + $concrete_total));
+				break;
+			case "50041":
+				 $sheet->setCellValue('A'.$rowCounter, "X"); 
+				 $sheet->setCellValue('B'.$rowCounter, "CORING SERVICES"); 
+				 $sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+			   break;
+			case "50044":
+				$sheet->setCellValue('A'.$rowCounter, "X"); 
+				$sheet->setCellValue('B'.$rowCounter, "DRILLING SVCS"); 
+				$sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+				break;
+			case "50045":
+				 $sheet->setCellValue('A'.$rowCounter, "X"); 
+				 $sheet->setCellValue('B'.$rowCounter, "DUMPING"); 
+				 $sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+			   break;
+			case "50046":
+				$sheet->setCellValue('A'.$rowCounter, "X"); 
+				$sheet->setCellValue('B'.$rowCounter, "FUSING TIE INS"); 
+				$sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+				break;
+			case "50047":
+				 $sheet->setCellValue('A'.$rowCounter, "X"); 
+				 $sheet->setCellValue('B'.$rowCounter, "GROUND THAW"); 
+				 $sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+			   break;
+			case "50048":
+				$sheet->setCellValue('A'.$rowCounter, "X"); 
+				$sheet->setCellValue('B'.$rowCounter, "HYDROVACING"); 
+				$sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+				break;
+			case "50049":
+				 $sheet->setCellValue('A'.$rowCounter, "X"); 
+				 $sheet->setCellValue('B'.$rowCounter, "LANDSCAPING MAT"); 
+				 $sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+			   break;
+			case "50050":
+				$sheet->setCellValue('A'.$rowCounter, "X"); 
+				$sheet->setCellValue('B'.$rowCounter, "PAVING"); 
+				$sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+				break;
+			case "50051":
+				 $sheet->setCellValue('A'.$rowCounter, "X"); 
+				 $sheet->setCellValue('B'.$rowCounter, "CITY ULA & EXC"); 
+				 $sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+			   break;
+			case "50052":
+				 $sheet->setCellValue('A'.$rowCounter, "X"); 
+				 $sheet->setCellValue('B'.$rowCounter, "RENTAL SIGNS"); 
+				 $sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+			   break;
+			case "50053":
+				$sheet->setCellValue('A'.$rowCounter, "X"); 
+				$sheet->setCellValue('B'.$rowCounter, "SAND GRAVEL"); 
+				$sheet->setCellValue('E'.$rowCounter, ($lineItem[1] + $sand_total + $gravel_total));
+				break;
+			case "50054":
+				 $sheet->setCellValue('A'.$rowCounter, "X"); 
+				 $sheet->setCellValue('B'.$rowCounter, "TRAFFIC CONTROL"); 
+				 $sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+			   break;
+			case "50057":
+				$sheet->setCellValue('A'.$rowCounter, "X"); 
+				$sheet->setCellValue('B'.$rowCounter, "TRUCKING SERVICE"); 
+				$sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+				break;
+			case "50058":
+				$sheet->setCellValue('A'.$rowCounter, "X"); 
+				$sheet->setCellValue('B'.$rowCounter, "HEAVY EQUIP RENT"); 
+				$sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+				break;
+			case "50060":
+				 $sheet->setCellValue('A'.$rowCounter, "X"); 
+				 $sheet->setCellValue('B'.$rowCounter, "SOIL SAMPLING"); 
+				 $sheet->setCellValue('E'.$rowCounter, $lineItem[1]);
+			   break;
+		}
+		$sheet->setCellValue('D'.$rowCounter, 1);
+		$rowCounter++;		
+	//}
+}
+// ================================== PO Entry Screen ========================================================
+$myWorkSheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, 'PO Entry Screen');
+$myWorkSheet->getTabColor()->setRGB('FF0000');
+$spreadsheet->addSheet($myWorkSheet, 5);
+$spreadsheet->setActiveSheetIndex(5);
+$sheet = $spreadsheet->getActiveSheet();
+
+// $sheetHeaders = [" ","Purchase For ", "Inventory ID", "Site ID", "Quantity","UOFM*","Unit Cost", "Extended Cost", "Account*", "Project*","Task*","Subaccount*", "Billable", "Receipt Status", "Voucher Status","Commitment Account", "Alternate ID", "Description", "Vendor"];
+// $headerCounter = 1;
+// foreach($sheetHeaders as $item){
+	// $sheet->setCellValueByColumnAndRow($headerCounter, 2, $item);
+	// $headerCounter++;
+// }
+
+// $spreadsheet->getActiveSheet()->getStyle('B2:S2')->getFill()
+    // ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    // ->getStartColor()->setRGB('0000FF');
+// $spreadsheet->getActiveSheet()->getStyle('B2:S2')->getFont()->applyFromArray( 
+     // ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  // 'font'  => [ 'bold' => true]] );
+$rowCounter = 2;
+foreach($vendor_list_ForPO as $venObj=>$value){
+	
+	 $sheetHeaders = [" ","Purchase For ", "Inventory ID", "Site ID", "Quantity","UOFM*","Unit Cost", "Extended Cost", "Account*", "Project*","Task*","Subaccount*", "Billable", "Receipt Status", "Voucher Status","Commitment Account", "Alternate ID", "Description", "Vendor"];
+	$headerCounter = 1;
+	
+	foreach($sheetHeaders as $item){
+	$sheet->setCellValueByColumnAndRow($headerCounter, $rowCounter, $item);
+	$headerCounter++;
+	}
+
+	$spreadsheet->getActiveSheet()->getStyle('B'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('B'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('B'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('B'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );
+	  
+	
+	$spreadsheet->getActiveSheet()->getStyle('C'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('C'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('C'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('C'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );
+	  
+	  $spreadsheet->getActiveSheet()->getStyle('D'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('D'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('D'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('D'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+	  $spreadsheet->getActiveSheet()->getStyle('E'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('E'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('E'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('E'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('F'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('F'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('F'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('F'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('G'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('H'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('H'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('H'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('H'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('I'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('J'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('J'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('J'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('J'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('K'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('K'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('K'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('K'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('L'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('L'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('L'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('L'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('M'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('M'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('M'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('M'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('N'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('N'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('N'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('N'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('O'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('O'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('O'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('O'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('P'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('P'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('P'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('P'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('Q'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('Q'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('Q'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('Q'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+	  $spreadsheet->getActiveSheet()->getStyle('R'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('R'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('R'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('R'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );	
+
+
+	  $spreadsheet->getActiveSheet()->getStyle('S'.$rowCounter)->getBorders()->getTop()
+	   ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+    $spreadsheet->getActiveSheet()->getStyle('S'.$rowCounter)->getBorders()->getBottom()
+	->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+     $spreadsheet->getActiveSheet()->getStyle('S'.$rowCounter)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('0000FF');
+	$spreadsheet->getActiveSheet()->getStyle('S'.$rowCounter)->getFont()->applyFromArray( 
+     ['color' => [ 'rgb' => 'FFFFFF' ], 
+	  'font'  => [ 'bold' => true]] );
+	   
+	$rowCounter++;
+	foreach($value as $arr){
+		$subAcct = $arr[10];
+		$subAcctFormatted =  substr($subAcct, 0,2)."-".substr($subAcct, 2, 1); //112 --> 11-2
+ 		$sheet->setCellValue('B'.$rowCounter, $arr[0]);
+		$sheet->setCellValue('C'.$rowCounter, $arr[1]);
+		$sheet->setCellValue('D'.$rowCounter, $arr[2]);
+		$sheet->setCellValue('E'.$rowCounter, $arr[3]);
+		$sheet->setCellValue('F'.$rowCounter, $arr[4]);
+		$sheet->setCellValue('G'.$rowCounter, $arr[5]);
+		$sheet->setCellValue('H'.$rowCounter, $arr[6]);
+		$sheet->setCellValue('I'.$rowCounter, $arr[7]);
+		$sheet->setCellValue('J'.$rowCounter, $arr[8]);
+		$sheet->setCellValue('K'.$rowCounter, $arr[9]);
+		$sheet->setCellValue('L'.$rowCounter, $subAcctFormatted);
+		$sheet->setCellValue('M'.$rowCounter, $arr[11]);
+		$sheet->setCellValue('N'.$rowCounter, $arr[12]);
+		$sheet->setCellValue('O'.$rowCounter, $arr[13]);
+		$sheet->setCellValue('P'.$rowCounter, $arr[14]);
+		$sheet->setCellValue('Q'.$rowCounter, $arr[15]);
+		$sheet->setCellValue('R'.$rowCounter, $arr[16]);
+		$sheet->setCellValue('S'.$rowCounter, $arr[17]);
+
+		$spreadsheet->getActiveSheet()->getStyle('H'.$rowCounter)->getNumberFormat()->setFormatCode('[Black]$ #,##0.00');
+
+		$rowCounter++;
+	}
+	
+	$rowCounter = $rowCounter + 2;
+}
+
+
+foreach (range('B','S') as $col) {
+	$spreadsheet->getActiveSheet()->getColumnDimension($col)->setWidth(12);
+} 
+
+/* if($heavyEquip_total > 0.0){
+	$rowCounter--;
+	$sheet->setCellValue('A'.$rowCounter, "X"); $sheet->setCellValue('B'.$rowCounter, "HEAVY EQUIP RENT"); $sheet->setCellValue('C'.$rowCounter, $heavyEquip_total);
+} */
+//$spreadsheet->getActiveSheet()->getStyle('C2:C60')->getNumberFormat()->setFormatCode('#,##0.00');
+/*foreach (range('A','D') as $col) {
+  $spreadsheet->getActiveSheet()->getColumnDimension($col)->setAutoSize(true);  
+}
+$spreadsheet->getActiveSheet()->freezePaneByColumnAndRow(1,2);
+$spreadsheet->getActiveSheet()->getStyle('A1:D1')->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A1:D1')->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK);
+$spreadsheet->getActiveSheet()->getStyle('A1:D1')->getFill()
+    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+    ->getStartColor()->setRGB('C0C0C0');*/
+// OUTPUT
+$writer = new Xlsx($spreadsheet);
+header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+header('Content-Disposition: attachment;filename="'.$projectID.'_'.$stage.'_'.$version.'_'.$estimateType.'.xlsx"');
+/* header('Cache-Control: max-age=0');
+header('Expires: Fri, 11 Nov 2011 11:11:11 GMT');
+header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
+header('Cache-Control: cache, must-revalidate');
+header('Pragma: public'); */
+$writer->save('php://output');
+
+
+?>
